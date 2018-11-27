@@ -87,7 +87,7 @@ public class BeanCopyUtil {
      */
     public static <T> List<T> copyListBeanByIgnore(List beforeList, Class<T> after, String[] ignoreProperties) {
         if (null == beforeList || beforeList.isEmpty()) {
-            return null;
+            return beforeList;
         }
         List<T> tList = Lists.newLinkedList();
         beforeList.stream().forEach(before -> {
