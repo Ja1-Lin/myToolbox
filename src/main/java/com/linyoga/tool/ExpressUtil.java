@@ -98,10 +98,9 @@ public class ExpressUtil {
     public static ExpressVO getJsonByNu(String nu) {
         AutoComNum autoComNum = getComCodeByNu(nu);
         ExpressVO expressVO = null;
-        if (Objects.nonNull(autoComNum)) {
+        if ( autoComNum != null ) {
             for (AutoComCode autoComCode : autoComNum.getAuto()) {
-                expressVO = getJsonQuery(autoComCode.getComCode(), nu);
-                if (Objects.nonNull(expressVO)) {
+                if ( (expressVO = getJsonQuery(autoComCode.getComCode(), nu)) != null) {
                     break;
                 }
             }

@@ -3,6 +3,7 @@ package com.linyoga.tool;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -22,7 +23,7 @@ public class TxVideoUtil {
     private static ScheduledThreadPoolExecutor exec = new ScheduledThreadPoolExecutor(1);
 
     /** 存储视频链接地址的集合 */
-    private static Map<String,String> videoUrlMap = new LinkedHashMap<>();
+    private static Map<String,String> videoUrlMap = new HashMap<>(16);
 
     /** 获取视频真实播放地址第一步的URL */
     private static String HTTP_VIDEO_URL_FIRST = "http://vv.video.qq.com/getinfo?vids=%s&platform=101001&charge=0&otype=json";
@@ -58,7 +59,7 @@ public class TxVideoUtil {
      * @throws IOException
      */
     public static String getUrlByVidsFromMap(String vids)throws IOException{
-        String url = null;
+        String url ;
         if( (url = videoUrlMap.get(vids)) == null ){
             url = getVideoUrlByVids( vids );
             videoUrlMap.put( vids , url );
