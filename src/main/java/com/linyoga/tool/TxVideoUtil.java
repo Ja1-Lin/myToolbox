@@ -68,8 +68,8 @@ public class TxVideoUtil {
     }
 
     public static void main(String[] args) throws IOException{
-        System.out.println(getUrlByVidsFromMap("z0793ih5usa"));
-        System.out.println(getUrlByVidsFromMap("z0793ih5usa"));
-        System.out.println(getUrlByVidsFromMap("t07945gf152"));
+        System.out.println(getUrlByVidsFromMap("w0647n5294g"));
+        System.out.println(getUrlByVidsFromMap("w0647n5294g"));
+        System.out.println(getUrlByVidsFromMap("m0742o3vons"));
     }
 }
