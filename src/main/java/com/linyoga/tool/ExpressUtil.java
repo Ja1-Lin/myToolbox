@@ -3,12 +3,14 @@ package com.linyoga.tool;
 import com.google.common.base.Strings;
 import com.google.gson.Gson;
 
+import java.io.IOException;
 import java.util.Date;
 import java.util.List;
-import java.util.Objects;
 
 import cn.hutool.http.HttpUtil;
 import lombok.Data;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
 
 /**
  * 物流信息查询工具类
@@ -60,10 +62,10 @@ public class ExpressUtil {
      *
      * @param nu 运单号
      */
-    public static String getHtmlUrlApiByNu(String nu) {
+    public static String getHtmlUrlApiByNu(String nu) throws IOException{
         AutoComNum autoComNum = getComCodeByNu(nu);
         String html = null;
-        if (Objects.nonNull(autoComNum)) {
+        if ( autoComNum != null ) {
             for (AutoComCode autoComCode : autoComNum.getAuto()) {
                 html = getHtmlUrlApi(autoComCode.getComCode(), nu);
                 if (!Strings.isNullOrEmpty(html)) {
@@ -95,7 +97,7 @@ public class ExpressUtil {
      * @param nu 运单号
      * @return 有可能为null。注意判断
      */
-    public static ExpressVO getJsonByNu(String nu) {
+    public static ExpressVO getJsonByNu(String nu) throws IOException{
         AutoComNum autoComNum = getComCodeByNu(nu);
         ExpressVO expressVO = null;
         if ( autoComNum != null ) {
@@ -126,12 +128,17 @@ public class ExpressUtil {
      *
      * @param nu 运单号
      */
-    public static AutoComNum getComCodeByNu(String nu) {
-        return new Gson().fromJson(
-                HttpUtil.get(new StringBuffer()
-                        .append(GET_COM_CODE_BY_NU_URL)
-                        .append("?text=").append(nu)
-                        .toString())
+    public static AutoComNum getComCodeByNu(String nu) throws IOException{
+        String body = null;
+        try {
+             body= new OkHttpClient().newCall( new Request.Builder()
+                    .url(GET_COM_CODE_BY_NU_URL + "?text=" + nu)
+                    .build()).execute().body().string();
+        }catch (IOException e){
+            e.printStackTrace();
+            throw e;
+        }
+        return new Gson().fromJson(body
                 , AutoComNum.class);
     }
 
@@ -143,11 +150,11 @@ public class ExpressUtil {
         String order = "desc";
 //        System.out.println(kuaidiApi(com, nu, show, muti, order));
 //        System.out.println(getHtmlUrlApi(com, nu));
-        System.out.println("htmlApiByNu : " + getHtmlUrlApiByNu(nu));
+//        System.out.println("htmlApiByNu : " + getHtmlUrlApiByNu(nu));
 //        ExpressVO expressVO = getJsonQuery(com , nu);
 //        System.out.println(expressVO.toString());
         System.out.println("comcode : " + getComCodeByName("圆通").toString());
-        System.out.println("getJsonByNu : " + getJsonByNu(nu).toString());
+//        System.out.println("getJsonByNu : " + getJsonByNu(nu).toString());
     }
 
     /**
