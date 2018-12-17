@@ -3,13 +3,12 @@ package com.linyoga.tool;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import cn.hutool.http.HttpUtil;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
 
 /**
  * 腾讯视频工具类
@@ -23,7 +22,7 @@ public class TxVideoUtil {
     private static ScheduledThreadPoolExecutor exec = new ScheduledThreadPoolExecutor(1);
 
     /** 存储视频链接地址的集合 */
-    private static Map<String,String> videoUrlMap = new HashMap<>(16);
+    private static ConcurrentHashMap<String,String> videoUrlMap = new ConcurrentHashMap<>(16);
 
     /** 获取视频真实播放地址第一步的URL */
     private static String HTTP_VIDEO_URL_FIRST = "http://vv.video.qq.com/getinfo?vids=%s&platform=101001&charge=0&otype=json";
@@ -39,7 +38,11 @@ public class TxVideoUtil {
      * @return
      */
     private static String getVideoUrlByVids(String vids) throws IOException {
-        String response = HttpUtil.get(String.format(HTTP_VIDEO_URL_FIRST , vids));
+        //获取真实视频的请求地址url
+        String response = new OkHttpClient().newCall( new Request.Builder()
+                .url( String.format( HTTP_VIDEO_URL_FIRST , vids ))
+                .build())
+                .execute().body().string();
         ObjectMapper mapper = new ObjectMapper();
         response = response.substring( response.indexOf("=") + 1 , response.length() - 1 );
         StringBuffer url = new StringBuffer( mapper
@@ -47,9 +50,14 @@ public class TxVideoUtil {
                 .get("vl").get("vi").get(0).get("ul").get("ui").get(0).get("url")
                 .textValue()
         );
-        String outJson2 = HttpUtil.get(String.format( HTTP_VIDEO_URL_SECOND , vids,vids ));
-        String key = mapper.readTree( outJson2.substring( outJson2.indexOf("=") + 1 , outJson2.length() - 1 ) ).get("key").textValue();
-        return url.append(vids).append(".mp4?vkey=").append(key).toString();
+        //获取真实视频的请求地址url中的vkey值
+        String outJson2 = new OkHttpClient().newCall( new Request.Builder()
+                .url( String.format( HTTP_VIDEO_URL_SECOND , vids,vids ) )
+                .build())
+                .execute().body().string();
+        String key = mapper.readTree( outJson2.substring( outJson2.indexOf("=") + 1 , outJson2.length() - 1 ) ).get( "key" ).textValue();
+        //最后将前面两个获取的值进行拼接成真实播放地址
+        return url.append( vids ).append( ".mp4?vkey=" ).append( key ).toString();
     }
 
     /**
@@ -58,19 +66,19 @@ public class TxVideoUtil {
      * @return
      * @throws IOException
      */
-    public static String getUrlByVidsFromMap(String vids)throws IOException{
+    public static String getUrlByVidsFromMap( String vids )throws IOException{
         String url ;
-        if( (url = videoUrlMap.get(vids)) == null ){
+        if( (url = videoUrlMap.get( vids ) ) == null ){
             url = getVideoUrlByVids( vids );
-            videoUrlMap.put( vids , url );
-            exec.schedule(() -> videoUrlMap.remove(vids),2, TimeUnit.HOURS);
+            videoUrlMap.putIfAbsent( vids , url );
+            exec.schedule(() -> videoUrlMap.remove( vids ),2, TimeUnit.HOURS);
         }
         return url;
     }
 
     public static void main(String[] args) throws IOException{
-        System.out.println(getUrlByVidsFromMap("w0647n5294g"));
-        System.out.println(getUrlByVidsFromMap("w0647n5294g"));
-        System.out.println(getUrlByVidsFromMap("m0742o3vons"));
+        System.out.println( getUrlByVidsFromMap( "w0647n5294g" ) );
+        System.out.println( getUrlByVidsFromMap( "w0647n5294g" ) );
+        System.out.println( getUrlByVidsFromMap( "m0742o3vons" ) );
     }
 }
