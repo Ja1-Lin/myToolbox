@@ -3,12 +3,20 @@ package com.linyoga.tool;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+
+import static java.util.concurrent.TimeUnit.HOURS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 /**
  * 腾讯视频工具类
@@ -19,10 +27,11 @@ import okhttp3.Request;
 public class TxVideoUtil {
 
     /** 初始化线程池 */
-    private static ScheduledThreadPoolExecutor exec = new ScheduledThreadPoolExecutor(1);
+    private static ScheduledThreadPoolExecutor exec = new ScheduledThreadPoolExecutor( 5 );
+    private static ExecutorService executorService = Executors.newFixedThreadPool( 5 );
 
     /** 存储视频链接地址的集合 */
-    private static ConcurrentHashMap<String,String> videoUrlMap = new ConcurrentHashMap<>(16);
+    private static ConcurrentHashMap<String, FutureTask<String>> videoUrlMaps = new ConcurrentHashMap<>(16);
 
     /** 获取视频真实播放地址第一步的URL */
     private static String HTTP_VIDEO_URL_FIRST = "http://vv.video.qq.com/getinfo?vids=%s&platform=101001&charge=0&otype=json";
@@ -37,7 +46,7 @@ public class TxVideoUtil {
      * @param vids
      * @return
      */
-    private static String getVideoUrlByVids(String vids) throws IOException {
+    private static String getVideoUrlByVids(final String vids) throws IOException {
         //获取真实视频的请求地址url
         String response = new OkHttpClient().newCall( new Request.Builder()
                 .url( String.format( HTTP_VIDEO_URL_FIRST , vids ))
@@ -66,19 +75,49 @@ public class TxVideoUtil {
      * @return
      * @throws IOException
      */
-    public static String getUrlByVidsFromMap( String vids )throws IOException{
-        String url ;
-        if( (url = videoUrlMap.get( vids ) ) == null ){
-            url = getVideoUrlByVids( vids );
-            videoUrlMap.putIfAbsent( vids , url );
-            exec.schedule(() -> videoUrlMap.remove( vids ),2, TimeUnit.HOURS);
+    public static String getUrlByVidsFromMaps( final String vids ){
+        Future<String> future;
+        if( ( future = videoUrlMaps.get( vids ) ) == null ){
+            //定义Future可以异步获取结果
+            FutureTask<String> task = new FutureTask<>(() -> getVideoUrlByVids( vids ));
+            //为了防止复合操作，if-null-add 普通map底层无法通过加锁确保原子性，所以用concurrentHashMap的putIfAbsent
+            future = videoUrlMaps.putIfAbsent( vids , task );
+            if( future == null ){
+                future = task;
+                //执行异步线程
+                executorService.execute( task );
+                //指定时间后执行一次移除操作
+                exec.schedule(() -> videoUrlMaps.remove( vids ) , 2 , HOURS );
+            }
+        }
+        String url = null;
+        try {
+            //获取结果
+            url = future.get();
+        }catch ( CancellationException e ){
+            videoUrlMaps.remove( vids , future );
+        }catch ( ExecutionException e ){
+            videoUrlMaps.remove( vids , future );
+            System.out.println(e.getCause());
+        }catch ( InterruptedException e ){
+            videoUrlMaps.remove( vids , future );
+            System.out.println(e.getCause());
         }
         return url;
     }
 
-    public static void main(String[] args) throws IOException{
-        System.out.println( getUrlByVidsFromMap( "w0647n5294g" ) );
-        System.out.println( getUrlByVidsFromMap( "w0647n5294g" ) );
-        System.out.println( getUrlByVidsFromMap( "m0742o3vons" ) );
+
+    public static void main(String[] args) throws java.lang.InterruptedException{
+        ExecutorService executor = Executors.newFixedThreadPool( 2 );
+        for( int i = 0 ; i < 2 ; ++i){
+            executor.submit( () -> {
+                System.out.println( getUrlByVidsFromMaps( "w0647n5294g" ) );
+            } );
+        }
+        SECONDS.sleep(2);
+        System.out.println( getUrlByVidsFromMaps( "w0647n5294g" ) );
+        SECONDS.sleep(20);
+        System.out.println( getUrlByVidsFromMaps( "w0647n5294g" ) );
+//        System.out.println( getUrlByVidsFromMap( "m0742o3vons" ) );
     }
 }
