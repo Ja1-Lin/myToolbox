@@ -10,7 +10,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -28,7 +31,12 @@ public class TxVideoUtil {
 
     /** 初始化线程池 */
     private static ScheduledThreadPoolExecutor exec = new ScheduledThreadPoolExecutor( 5 );
-    private static ExecutorService executorService = Executors.newFixedThreadPool( 5 );
+
+    private static ExecutorService executorService = new ThreadPoolExecutor( 10
+            , 64
+            , 0L
+            , TimeUnit.SECONDS
+            , new LinkedBlockingQueue<>());
 
     /** 存储视频链接地址的集合 */
     private static ConcurrentHashMap<String, FutureTask<String>> videoUrlMaps = new ConcurrentHashMap<>(16);
@@ -38,7 +46,6 @@ public class TxVideoUtil {
 
     /** 获取视频真实播放地址第二步的URL */
     private static String HTTP_VIDEO_URL_SECOND = "http://vv.video.qq.com/getkey?format=2&otype=json&vt=150&vid=%s&ran=02E9477521511726081&charge=0&filename=%s.mp4&platform=11";
-
 
     /**
      * 获取腾讯视频真实播放地址
@@ -75,7 +82,7 @@ public class TxVideoUtil {
      * @return
      * @throws IOException
      */
-    public static String getUrlByVidsFromMaps( final String vids ){
+    public static String getUrlByVidsFromMaps( final String vids ) throws IOException {
         Future<String> future;
         if( ( future = videoUrlMaps.get( vids ) ) == null ){
             //定义Future可以异步获取结果
@@ -103,15 +110,23 @@ public class TxVideoUtil {
             videoUrlMaps.remove( vids , future );
             System.out.println(e.getCause());
         }
-        return url;
+        return url == null ? getVideoUrlByVids( vids ) : url;
     }
 
 
-    public static void main(String[] args) throws java.lang.InterruptedException{
-        ExecutorService executor = Executors.newFixedThreadPool( 2 );
+    public static void main(String[] args) throws java.lang.InterruptedException , IOException{
+        ExecutorService executor = new ThreadPoolExecutor( 2
+                , 10
+                , 0L
+                , TimeUnit.SECONDS
+                , new LinkedBlockingQueue<>());
         for( int i = 0 ; i < 2 ; ++i){
             executor.submit( () -> {
-                System.out.println( getUrlByVidsFromMaps( "w0647n5294g" ) );
+                try {
+                    System.out.println( getUrlByVidsFromMaps( "w0647n5294g" ) );
+                }catch (IOException e){
+                    e.printStackTrace();
+                }
             } );
         }
         SECONDS.sleep(2);
