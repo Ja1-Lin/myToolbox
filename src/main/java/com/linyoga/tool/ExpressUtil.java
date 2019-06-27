@@ -1,11 +1,10 @@
 package com.linyoga.tool;
 
-import com.google.common.base.Strings;
 import com.google.gson.Gson;
 
 import java.util.Date;
 import java.util.List;
-import java.util.Objects;
+import java.util.Optional;
 
 import cn.hutool.http.Header;
 import cn.hutool.http.HttpRequest;
@@ -19,7 +18,7 @@ import lombok.Data;
  */
 public class ExpressUtil {
 
-    private static final String key = "b6761b54f86f202f";
+    private static final String KEY = "b6761b54f86f202f";
 
     /**
      * header中用户代理信息，模拟浏览器
@@ -30,25 +29,25 @@ public class ExpressUtil {
      * 返回格式为JSON的物流信息的接口地址
      */
     private static final String QUERY_URL_GET_JSON = "https://www.kuaidi100.com/query";
-    private static final HttpRequest QUERY_URL_GET_JSON_REQUEST = HttpRequest.get(QUERY_URL_GET_JSON).header(Header.USER_AGENT,USER_AGENT);
+    private static final HttpRequest QUERY_URL_GET_JSON_REQUEST = HttpRequest.get(QUERY_URL_GET_JSON).header(Header.USER_AGENT, USER_AGENT);
 
     /**
      * 返回格式为HTML物流信息的接口地址
      */
     private static final String QUERY_URL_GET_HTML = "http://www.kuaidi100.com/applyurl";
-    private static final HttpRequest QUERY_URL_GET_HTML_REQUEST = HttpRequest.get(QUERY_URL_GET_HTML).header(Header.USER_AGENT,USER_AGENT);
+    private static final HttpRequest QUERY_URL_GET_HTML_REQUEST = HttpRequest.get(QUERY_URL_GET_HTML).header(Header.USER_AGENT, USER_AGENT);
 
     /**
      * 获取物流公司代码的接口地址
      */
     private static final String GET_COM_CODE_URL = "http://kuaidi100.wlphp.com/api.php";
-    private static final HttpRequest GET_COM_CODE_URL_REQUEST = HttpRequest.get(GET_COM_CODE_URL).header(Header.USER_AGENT,USER_AGENT);
+    private static final HttpRequest GET_COM_CODE_URL_REQUEST = HttpRequest.get(GET_COM_CODE_URL).header(Header.USER_AGENT, USER_AGENT);
 
     /**
      * 根据运单号获取物流公司代码的接口地址
      */
     private static final String GET_COM_CODE_BY_NU_URL = "http://www.kuaidi100.com/autonumber/autoComNum";
-    private static final HttpRequest GET_COM_CODE_BY_NU_URL_REQUEST = HttpRequest.get(GET_COM_CODE_BY_NU_URL).header(Header.USER_AGENT,USER_AGENT);
+    private static final HttpRequest GET_COM_CODE_BY_NU_URL_REQUEST = HttpRequest.get(GET_COM_CODE_BY_NU_URL).header(Header.USER_AGENT, USER_AGENT);
 
     /**
      * 根据物流公司代码和运单号获取html格式物流详细信息的路径
@@ -58,9 +57,9 @@ public class ExpressUtil {
      * @return html格式的地址
      */
     public static String getHtmlUrlApi(String com, String nu) {
-        return QUERY_URL_GET_HTML_REQUEST.form("key",key)
-                .form("com",com)
-                .form("nu",nu)
+        return QUERY_URL_GET_HTML_REQUEST.form("key", KEY)
+                .form("com", com)
+                .form("nu", nu)
                 .execute().body();
     }
 
@@ -70,17 +69,12 @@ public class ExpressUtil {
      * @param nu 运单号
      */
     public static String getHtmlUrlApiByNu(String nu) {
-        AutoComNum autoComNum = getComCodeByNu(nu);
-        String html = null;
-        if (Objects.nonNull(autoComNum)) {
-            for (AutoComCode autoComCode : autoComNum.getAuto()) {
-                html = getHtmlUrlApi(autoComCode.getComCode(), nu);
-                if (!Strings.isNullOrEmpty(html)) {
-                    break;
-                }
-            }
-        }
-        return html;
+        return Optional.ofNullable(getComCodeByNu(nu))
+                .map(autoComNum -> autoComNum.getAuto().stream()
+                        .map(autoComCode -> getHtmlUrlApi(autoComCode.getComCode(), nu))
+                        .findFirst()
+                        .orElse(null))
+                .orElse(null);
     }
 
     /**
@@ -93,28 +87,25 @@ public class ExpressUtil {
     public static ExpressVO getJsonQuery(String com, String nu) {
         return new Gson().fromJson(
                 QUERY_URL_GET_JSON_REQUEST
-                        .form("type",com)
-                        .form("postid",nu)
+                        .form("type", com)
+                        .form("postid", nu)
                         .execute().body()
                 , ExpressVO.class);
     }
 
     /**
      * 根据运单号获取json格式的物流详细信息
+     *
      * @param nu 运单号
      * @return 有可能为null。注意判断
      */
     public static ExpressVO getJsonByNu(String nu) {
-        AutoComNum autoComNum = getComCodeByNu(nu);
-        ExpressVO expressVO = null;
-        if (Objects.nonNull(autoComNum)) {
-            for (AutoComCode autoComCode : autoComNum.getAuto()) {
-                if ( (expressVO = getJsonQuery(autoComCode.getComCode(), nu)) != null) {
-                    break;
-                }
-            }
-        }
-        return expressVO;
+        return Optional.ofNullable(getComCodeByNu(nu))
+                .map(autoComNum -> autoComNum.getAuto().stream()
+                        .map(autoComCode -> getJsonQuery(autoComCode.getComCode(), nu))
+                        .findFirst()
+                        .orElse(null))
+                .orElse(null);
     }
 
     /**
@@ -123,7 +114,7 @@ public class ExpressUtil {
      * @param comName 公司名字
      */
     public static ComCode getComCodeByName(String comName) {
-        return new Gson().fromJson(GET_COM_CODE_URL_REQUEST.form("type",comName).execute().body()
+        return new Gson().fromJson(GET_COM_CODE_URL_REQUEST.form("type", comName).execute().body()
                 , ComCode.class);
     }
 
@@ -133,14 +124,23 @@ public class ExpressUtil {
      * @param nu 运单号
      */
     public static AutoComNum getComCodeByNu(String nu) {
-        return new Gson().fromJson(GET_COM_CODE_BY_NU_URL_REQUEST.form("text",nu).execute().body()
+        return new Gson().fromJson(GET_COM_CODE_BY_NU_URL_REQUEST.form("text", nu).execute().body()
                 , AutoComNum.class);
     }
 
     public static void main(String[] agrs) {
+        String com = "yunda";
         String nu = "3102336465343";
+        String show = "0";
+        String muti = "1";
+        String order = "desc";
+//        System.out.println(kuaidiApi(com, nu, show, muti, order));
+        System.out.println(getHtmlUrlApi(com, nu));
         System.out.println("htmlApiByNu : " + getHtmlUrlApiByNu(nu));
+        ExpressVO expressVO = getJsonQuery("yunda", nu);
+        System.out.println(expressVO.toString());
         System.out.println("comcode : " + getComCodeByName("百世汇通").toString());
+        System.out.println("comcode : " + getComCodeByNu(nu).toString());
         System.out.println("getJsonByNu : " + getJsonByNu(nu).toString());
     }
 

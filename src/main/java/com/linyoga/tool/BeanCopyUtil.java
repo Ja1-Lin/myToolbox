@@ -13,7 +13,9 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 
 /**
@@ -74,26 +76,40 @@ public class BeanCopyUtil {
      * @param beforeList 需转换的对象列表
      * @param after      目标对象的class类
      */
-    public static <T> List<T> copyListBean(List beforeList, Class<T> after) {
+    public static <T, E> List<T> copyListBean(List<E> beforeList, Class<T> after) {
         return copyListBeanByIgnore(beforeList, after, null);
     }
 
     /**
      * 将list集合中的元素替换成after目标对象 忽略指定属性
+     * <p>
+     * copyListBeanByIgnore 所需参数
+     * 1、转换对象中的list类型属性值
+     * 遍历属性判断是否为list类型，判断是否为忽略的属性值
+     * 则获取该属性值
+     * 判断是否有注解
+     * 无注解，则不转换
+     * 有注解但无属性值，则按该属性名到目标对象中找到list属性
+     * 有，则获取对应list属性值。
+     * 获得的值：
+     * 属性Filed
+     * 忽略的值
+     * 2、目标对象list的泛型的class
+     * 根据filed获取泛型中的class
+     * 3、忽略属性值转换
+     * 忽略的值
      *
      * @param beforeList       需转换的对象列表
      * @param after            目标对象的class类
      * @param ignoreProperties 忽略指定属性
      */
-    public static <T> List<T> copyListBeanByIgnore(List beforeList, Class<T> after, String[] ignoreProperties) {
+    public static <T, E> List<T> copyListBeanByIgnore(List<E> beforeList, Class<T> after, String[] ignoreProperties) {
         if (null == beforeList || beforeList.isEmpty()) {
-            return beforeList;
+            return null;
         }
-        List<T> tList = Lists.newLinkedList();
-        beforeList.stream().forEach(before -> {
-            tList.add(copyBeanByIgnore(before, after, ignoreProperties));
-        });
-        return tList;
+        return beforeList.stream()
+                .map(before -> copyBeanByIgnore(before, after, ignoreProperties))
+                .collect(Collectors.toList());
     }
 
     /**
@@ -112,7 +128,9 @@ public class BeanCopyUtil {
                 }
 
                 //判断该属性是否需忽略
-                List<String> ignoreList = (ignoreProperties != null ? Arrays.asList(ignoreProperties) : null);
+                List<String> ignoreList = Optional.ofNullable(ignoreProperties)
+                        .map(strings -> Arrays.asList(ignoreProperties))
+                        .orElse(null);
                 if (null != ignoreList && ignoreList.contains(field.getName())) {
                     continue;
                 }
@@ -137,16 +155,16 @@ public class BeanCopyUtil {
                 if (field.getType().isAssignableFrom(List.class) || field.getType().isAssignableFrom(Set.class)) {
 
                     //获取list类型的属性值
-                    List list = field.getType().isAssignableFrom(Set.class)
+                    List<E> list = field.getType().isAssignableFrom(Set.class)
                             ? Lists.newArrayList((Set) field.get(before))
-                            : (List) field.get(before);
+                            : (List<E>) field.get(before);
                     if (null == list || list.isEmpty()) {
                         continue;
                     }
                     //转换
-                    afterFiled.set(after, copyListBeanByIgnore(list, getGenericType(afterFiled), convert.ignorePropertry()));
+                    afterFiled.set(after, copyListBeanByIgnore(list, getGenericType(afterFiled), convert.ignoreProperty()));
                 } else {
-                    afterFiled.set(after, copyBeanByIgnore(field.get(before), convert.className(), convert.ignorePropertry()));
+                    afterFiled.set(after, copyBeanByIgnore(field.get(before), convert.className(), convert.ignoreProperty()));
                 }
             }
         } catch (IllegalAccessException e) {
